@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TikTok User Video Summary</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        background: #f0f2f5;
+        color: #161823;
+        min-height: 100vh;
+      }
+
+      header {
+        background: #fff;
+        border-bottom: 1px solid #e0e0e0;
+        padding: 0 24px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        height: 56px;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+      }
+
+      header svg {
+        width: 32px;
+        height: 32px;
+      }
+
+      header h1 {
+        font-size: 18px;
+        font-weight: 700;
+        color: #161823;
+      }
+
+      .container {
+        max-width: 960px;
+        margin: 32px auto;
+        padding: 0 16px;
+      }
+
+      /* Search form */
+      .search-box {
+        background: #fff;
+        border-radius: 12px;
+        padding: 24px;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+        margin-bottom: 28px;
+      }
+
+      .search-box h2 {
+        font-size: 16px;
+        font-weight: 600;
+        margin-bottom: 16px;
+        color: #161823;
+      }
+
+      .input-row {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .input-row input {
+        flex: 1;
+        min-width: 180px;
+        padding: 10px 14px;
+        border: 1.5px solid #d0d0d0;
+        border-radius: 8px;
+        font-size: 14px;
+        color: #161823;
+        outline: none;
+        transition: border-color 0.2s;
+      }
+
+      .input-row input:focus {
+        border-color: #fe2c55;
+      }
+
+      .input-row button {
+        padding: 10px 22px;
+        background: #fe2c55;
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.2s;
+        white-space: nowrap;
+      }
+
+      .input-row button:hover {
+        background: #d4193e;
+      }
+
+      .input-row button:disabled {
+        background: #f0a0ad;
+        cursor: not-allowed;
+      }
+
+      /* Profile card */
+      #profile-section {
+        display: none;
+        background: #fff;
+        border-radius: 12px;
+        padding: 20px 24px;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+        margin-bottom: 28px;
+        align-items: center;
+        gap: 20px;
+        flex-wrap: wrap;
+      }
+
+      #profile-section.visible {
+        display: flex;
+      }
+
+      .profile-avatar {
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        object-fit: cover;
+        background: #eee;
+      }
+
+      .profile-info {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .profile-info .nickname {
+        font-size: 18px;
+        font-weight: 700;
+      }
+
+      .profile-info .username {
+        font-size: 13px;
+        color: #757575;
+        margin-top: 2px;
+      }
+
+      .profile-info .bio {
+        font-size: 13px;
+        color: #444;
+        margin-top: 6px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 400px;
+      }
+
+      .profile-stats {
+        display: flex;
+        gap: 24px;
+        flex-wrap: wrap;
+      }
+
+      .stat-item {
+        text-align: center;
+      }
+
+      .stat-item .value {
+        font-size: 17px;
+        font-weight: 700;
+      }
+
+      .stat-item .label {
+        font-size: 11px;
+        color: #757575;
+        margin-top: 2px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      /* Video grid */
+      #videos-section {
+        display: none;
+      }
+
+      #videos-section.visible {
+        display: block;
+      }
+
+      .section-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 16px;
+      }
+
+      .section-header h3 {
+        font-size: 15px;
+        font-weight: 700;
+      }
+
+      .section-header .total-badge {
+        background: #fe2c55;
+        color: #fff;
+        border-radius: 20px;
+        padding: 2px 10px;
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+      .video-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        gap: 16px;
+      }
+
+      .video-card {
+        background: #fff;
+        border-radius: 12px;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        transition: transform 0.18s, box-shadow 0.18s;
+      }
+
+      .video-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.13);
+      }
+
+      .video-thumb-wrap {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 9 / 16;
+        background: #1a1a2e;
+        overflow: hidden;
+      }
+
+      .video-thumb-wrap img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+      }
+
+      .video-thumb-wrap .duration-badge {
+        position: absolute;
+        bottom: 6px;
+        right: 8px;
+        background: rgba(0, 0, 0, 0.6);
+        color: #fff;
+        font-size: 11px;
+        padding: 2px 6px;
+        border-radius: 4px;
+      }
+
+      .video-thumb-wrap .no-thumb {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        color: #555;
+        font-size: 13px;
+      }
+
+      .video-body {
+        padding: 12px 14px;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .video-desc {
+        font-size: 13px;
+        color: #161823;
+        line-height: 1.5;
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+
+      .video-desc.empty {
+        color: #aaa;
+        font-style: italic;
+      }
+
+      .video-stats {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 4px 8px;
+        font-size: 12px;
+        color: #555;
+      }
+
+      .video-stats .stat {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+
+      .video-stats .stat svg {
+        width: 13px;
+        height: 13px;
+        flex-shrink: 0;
+        color: #fe2c55;
+      }
+
+      .video-footer {
+        padding: 8px 14px 12px;
+        font-size: 11px;
+        color: #aaa;
+        border-top: 1px solid #f0f0f0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .video-footer a {
+        color: #fe2c55;
+        text-decoration: none;
+        font-weight: 500;
+      }
+
+      .video-footer a:hover {
+        text-decoration: underline;
+      }
+
+      /* Status messages */
+      #status {
+        display: none;
+        padding: 14px 18px;
+        border-radius: 10px;
+        font-size: 14px;
+        margin-bottom: 20px;
+      }
+
+      #status.loading {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: #fff8e1;
+        color: #8a6a00;
+      }
+
+      #status.error {
+        display: block;
+        background: #fff0f3;
+        color: #c0003c;
+        border: 1px solid #ffc0cd;
+      }
+
+      .spinner {
+        width: 20px;
+        height: 20px;
+        border: 3px solid #f0d070;
+        border-top-color: #c8a000;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+        flex-shrink: 0;
+      }
+
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Header -->
+    <header>
+      <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <rect width="32" height="32" rx="8" fill="#010101"/>
+        <path d="M22.5 8.5c.4 2.1 1.7 3.5 4 3.8v2.7c-1.4.1-2.6-.3-4-.9v8.3c0 4.2-3.2 6.9-7.1 6.4-3.3-.4-5.8-3.2-5.8-6.6 0-3.7 3-6.7 6.7-6.5v2.9c-2 0-3.7 1.5-3.7 3.6 0 2 1.5 3.6 3.5 3.7 2 .1 3.6-1.5 3.6-3.5V8.5h2.8z" fill="#FE2C55"/>
+        <path d="M20.5 7.5c.4 2.1 1.7 3.5 4 3.8v2.7c-1.4.1-2.6-.3-4-.9v8.3c0 4.2-3.2 6.9-7.1 6.4-3.3-.4-5.8-3.2-5.8-6.6 0-3.7 3-6.7 6.7-6.5v2.9c-2 0-3.7 1.5-3.7 3.6 0 2 1.5 3.6 3.5 3.7 2 .1 3.6-1.5 3.6-3.5V7.5h2.8z" fill="#fff"/>
+      </svg>
+      <h1>TikTok Video Summary</h1>
+    </header>
+
+    <div class="container">
+      <!-- Search form -->
+      <div class="search-box">
+        <h2>Search User Videos</h2>
+        <div class="input-row">
+          <input
+            type="text"
+            id="username-input"
+            placeholder="Enter TikTok username (e.g. charlidamelio)"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <input
+            type="number"
+            id="limit-input"
+            placeholder="Limit (default 20)"
+            min="1"
+            max="100"
+            style="max-width: 170px;"
+          />
+          <button id="search-btn">Search</button>
+        </div>
+      </div>
+
+      <!-- Status -->
+      <div id="status"></div>
+
+      <!-- Profile card -->
+      <div id="profile-section"></div>
+
+      <!-- Video grid -->
+      <div id="videos-section"></div>
+    </div>
+
+    <script>
+      /* ── helpers ── */
+      function safeUrl(str) {
+        if (!str) return "";
+        try {
+          const u = new URL(str);
+          return u.protocol === "https:" || u.protocol === "http:" ? str : "";
+        } catch (_) {
+          return "";
+        }
+      }
+
+      function fmtNum(n) {
+        if (n == null) return "—";
+        n = Number(n);
+        if (n >= 1_000_000) return (n / 1_000_000).toFixed(1).replace(/\.0$/, "") + "M";
+        if (n >= 1_000) return (n / 1_000).toFixed(1).replace(/\.0$/, "") + "K";
+        return n.toLocaleString();
+      }
+
+      function fmtDate(ts) {
+        if (!ts) return "";
+        return new Date(ts * 1000).toLocaleDateString(undefined, {
+          year: "numeric", month: "short", day: "numeric"
+        });
+      }
+
+      function fmtDuration(secs) {
+        if (!secs) return "";
+        const m = Math.floor(secs / 60);
+        const s = secs % 60;
+        return `${m}:${String(s).padStart(2, "0")}`;
+      }
+
+      function setStatus(type, msg) {
+        const el = document.getElementById("status");
+        el.className = type;
+        if (type === "loading") {
+          el.innerHTML = `<div class="spinner"></div><span>${msg}</span>`;
+        } else {
+          el.textContent = msg;
+        }
+      }
+
+      function clearStatus() {
+        const el = document.getElementById("status");
+        el.className = "";
+        el.style.display = "none";
+        el.innerHTML = "";
+      }
+
+      /* ── icons ── */
+      const icons = {
+        heart: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>`,
+        comment: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`,
+        share: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92c0-1.61-1.31-2.92-2.92-2.92z"/></svg>`,
+        play: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`,
+        bookmark: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z"/></svg>`
+      };
+
+      /* ── render profile ── */
+      function renderProfile(user, stats) {
+        const el = document.getElementById("profile-section");
+        const avatarSrc = safeUrl(user.avatarMedium || user.avatarThumb || "");
+        el.innerHTML = `
+          <img class="profile-avatar" src="${avatarSrc}"
+               alt="${escapeHtml(user.nickname)}" onerror="this.style.background='#ddd'">
+          <div class="profile-info">
+            <div class="nickname">${escapeHtml(user.nickname)}${user.verified ? " ✓" : ""}</div>
+            <div class="username">@${escapeHtml(user.username)}</div>
+            ${user.signature ? `<div class="bio">${escapeHtml(user.signature)}</div>` : ""}
+          </div>
+          <div class="profile-stats">
+            <div class="stat-item">
+              <div class="value">${fmtNum(stats.videoCount)}</div>
+              <div class="label">Videos</div>
+            </div>
+            <div class="stat-item">
+              <div class="value">${fmtNum(stats.followerCount)}</div>
+              <div class="label">Followers</div>
+            </div>
+            <div class="stat-item">
+              <div class="value">${fmtNum(stats.followingCount)}</div>
+              <div class="label">Following</div>
+            </div>
+            <div class="stat-item">
+              <div class="value">${fmtNum(stats.heartCount)}</div>
+              <div class="label">Likes</div>
+            </div>
+          </div>
+        `;
+        el.classList.add("visible");
+      }
+
+      /* ── render videos ── */
+      function renderVideos(posts, username) {
+        const section = document.getElementById("videos-section");
+
+        if (!posts || posts.length === 0) {
+          section.innerHTML = `<p style="color:#999;text-align:center;padding:32px 0;">No videos found for this user.</p>`;
+          section.classList.add("visible");
+          return;
+        }
+
+        const header = `
+          <div class="section-header">
+            <h3>Videos</h3>
+            <span class="total-badge">${posts.length} loaded</span>
+          </div>
+        `;
+
+        const cards = posts.map((post) => {
+          const isImage = Array.isArray(post.imagePost) && post.imagePost.length > 0;
+          const rawThumb = post.video?.cover || (isImage ? post.imagePost[0] : null);
+          const thumb = safeUrl(rawThumb);
+          const duration = post.video?.duration ? fmtDuration(post.video.duration) : "";
+          const desc = post.desc ? escapeHtml(post.desc) : null;
+          const videoUrl = `https://www.tiktok.com/@${encodeURIComponent(username)}/video/${encodeURIComponent(post.id)}`;
+
+          return `
+            <div class="video-card">
+              <div class="video-thumb-wrap">
+                ${thumb
+                  ? `<img src="${thumb}" alt="Thumbnail" loading="lazy" onerror="this.parentElement.innerHTML='<div class=\\"no-thumb\\">No thumbnail</div>'">`
+                  : `<div class="no-thumb">No thumbnail</div>`}
+                ${duration ? `<span class="duration-badge">${duration}</span>` : ""}
+              </div>
+              <div class="video-body">
+                <div class="video-desc ${desc ? "" : "empty"}">${desc || "No description"}</div>
+                <div class="video-stats">
+                  <span class="stat">${icons.heart}${fmtNum(post.stats?.likeCount)}</span>
+                  <span class="stat">${icons.comment}${fmtNum(post.stats?.commentCount)}</span>
+                  <span class="stat">${icons.play}${fmtNum(post.stats?.playCount)}</span>
+                  <span class="stat">${icons.share}${fmtNum(post.stats?.shareCount)}</span>
+                  ${post.stats?.collectCount != null
+                    ? `<span class="stat">${icons.bookmark}${fmtNum(post.stats.collectCount)}</span>`
+                    : ""}
+                </div>
+              </div>
+              <div class="video-footer">
+                <span>${fmtDate(post.createTime)}</span>
+                <a href="${videoUrl}" target="_blank" rel="noopener">View on TikTok ↗</a>
+              </div>
+            </div>
+          `;
+        }).join("");
+
+        section.innerHTML = header + `<div class="video-grid">${cards}</div>`;
+        section.classList.add("visible");
+      }
+
+      /* ── XSS helper ── */
+      function escapeHtml(str) {
+        return String(str)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+      /* ── main ── */
+      async function loadUserVideos() {
+        const usernameInput = document.getElementById("username-input");
+        const limitInput = document.getElementById("limit-input");
+        const btn = document.getElementById("search-btn");
+
+        const username = usernameInput.value.trim().replace(/^@/, "");
+        if (!username) {
+          setStatus("error", "Please enter a TikTok username.");
+          return;
+        }
+
+        const limit = parseInt(limitInput.value, 10) || 20;
+
+        // Reset
+        document.getElementById("profile-section").classList.remove("visible");
+        document.getElementById("profile-section").innerHTML = "";
+        document.getElementById("videos-section").classList.remove("visible");
+        document.getElementById("videos-section").innerHTML = "";
+        clearStatus();
+
+        btn.disabled = true;
+        setStatus("loading", `Fetching videos for @${username}…`);
+
+        try {
+          // Fetch profile
+          const profileRes = await fetch(
+            `/api/user-profile?username=${encodeURIComponent(username)}`
+          );
+          const profileData = await profileRes.json();
+
+          if (profileData.status === "success" && profileData.result) {
+            renderProfile(profileData.result.user, profileData.result.stats);
+          }
+
+          // Fetch videos
+          const videosRes = await fetch(
+            `/api/user-videos?username=${encodeURIComponent(username)}&limit=${limit}`
+          );
+          const videosData = await videosRes.json();
+
+          clearStatus();
+
+          if (videosData.status === "error") {
+            setStatus("error", videosData.message || "Failed to fetch videos.");
+            return;
+          }
+
+          renderVideos(videosData.result, username);
+        } catch (err) {
+          setStatus("error", `Request failed: ${err.message}. Make sure the server is running (npm run serve).`);
+        } finally {
+          btn.disabled = false;
+        }
+      }
+
+      /* Allow Enter key to trigger search, and wire up the button */
+      document.getElementById("search-btn").addEventListener("click", loadUserVideos);
+      document.getElementById("username-input").addEventListener("keydown", function (e) {
+        if (e.key === "Enter") loadUserVideos();
+      });
+    </script>
+  </body>
+</html>
