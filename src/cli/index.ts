@@ -1162,4 +1162,116 @@ program
     }
   })
 
+// =============================================
+// Summarize Profile Command
+// =============================================
+program
+  .command("summarize-profile")
+  .description(
+    "Summarize the last N videos from a TikTok profile using Google Gemini AI"
+  )
+  .argument(
+    "<profileUrlOrUsername>",
+    "TikTok profile URL or username (e.g. https://www.tiktok.com/@username or @username)"
+  )
+  .option(
+    "-k, --key <apiKey>",
+    "Google Gemini API key (or set GEMINI_API_KEY env var)"
+  )
+  .option(
+    "-n, --count <number>",
+    "Number of recent videos to summarize",
+    (val) => parseInt(val),
+    5
+  )
+  .option("--proxy <proxy>", "Proxy URL (http/https/socks)")
+  .action(async (profileUrlOrUsername, options) => {
+    try {
+      const geminiApiKey = options.key || process.env.GEMINI_API_KEY
+      if (!geminiApiKey) {
+        Logger.error(
+          "Gemini API key is required. Use -k/--key <apiKey> or set the GEMINI_API_KEY environment variable."
+        )
+        Logger.info(
+          "Get a free API key at: https://aistudio.google.com/app/apikey"
+        )
+        return
+      }
+
+      // Extract username from URL or use input directly
+      const usernameMatch = profileUrlOrUsername.match(
+        /(?:https?:\/\/)?(?:www\.|m\.)?tiktok\.com\/@([\w.]+)/
+      )
+      const username = usernameMatch
+        ? usernameMatch[1]
+        : profileUrlOrUsername.replace(/^@/, "")
+
+      const count = options.count || 5
+
+      Logger.info(
+        `Fetching last ${count} video(s) from @${username}...`
+      )
+
+      const postsResult = await Tiktok.GetUserPosts(username, {
+        postLimit: count,
+        proxy: options.proxy
+      })
+
+      if (postsResult.status !== "success" || !postsResult.result?.length) {
+        Logger.error(
+          `Failed to fetch posts for @${username}: ${postsResult.message || "No posts found"}`
+        )
+        return
+      }
+
+      const posts = postsResult.result.slice(0, count)
+      Logger.info(`Found ${posts.length} video(s). Generating summaries...\n`)
+
+      for (const [index, post] of posts.entries()) {
+        const authorUsername =
+          post.author?.username || post.author?.["uniqueId"] || username
+        const videoUrl = `${_tiktokDesktopUrl}/@${authorUsername}/video/${post.id}`
+
+        Logger.info(`---- VIDEO ${index + 1} of ${posts.length} ----`)
+        Logger.result(`Video ID: ${post.id}`, chalk.green)
+        Logger.result(`Description: ${post.desc || "N/A"}`, chalk.yellow)
+        Logger.result(`URL: ${videoUrl}`, chalk.blue)
+
+        Logger.info("Generating AI summary...")
+        const summaryResult = await Tiktok.SummarizeVideo(
+          videoUrl,
+          geminiApiKey,
+          { proxy: options.proxy }
+        )
+
+        if (summaryResult.status === "success" && summaryResult.result) {
+          Logger.result(
+            `Summary: ${summaryResult.result.summary}`,
+            chalk.cyan
+          )
+          if (
+            summaryResult.result.hashtags &&
+            summaryResult.result.hashtags.length > 0
+          ) {
+            Logger.result(
+              `Hashtags: ${summaryResult.result.hashtags
+                .map((h) => `#${h}`)
+                .join(", ")}`,
+              chalk.magenta
+            )
+          }
+        } else {
+          Logger.warning(
+            `Could not summarize video ${post.id}: ${summaryResult.message || "Unknown error"}`
+          )
+        }
+        console.log()
+      }
+
+      Logger.success(`Done! Summarized ${posts.length} video(s) from @${username}.`)
+    } catch (error) {
+      Logger.error(`Error: ${error.message}`)
+    }
+  })
+
 program.parse()

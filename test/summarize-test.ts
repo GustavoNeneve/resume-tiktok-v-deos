@@ -3,7 +3,7 @@ import Tiktok from "../src/index"
 
 async function testSummarizeVideo() {
   try {
-    const url = "https://www.tiktok.com/@tobz2k19/video/7451777267107187986" // Change to a valid TikTok video URL
+    const url = process.env.TEST_VIDEO_URL || "https://www.tiktok.com/@username/video/0000000000000000000" // Set TEST_VIDEO_URL env var to a valid TikTok video URL
     const geminiApiKey = process.env.GEMINI_API_KEY
 
     if (!geminiApiKey) {

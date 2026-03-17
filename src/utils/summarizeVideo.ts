@@ -28,9 +28,7 @@ const buildSummaryPrompt = (
     hashtagStr,
     ``,
     `Summary:`
-  ]
-    .filter((line) => line !== undefined)
-    .join("\n")
+  ].join("\n")
 }
 
 /**
