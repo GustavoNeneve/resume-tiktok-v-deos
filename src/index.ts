@@ -46,6 +46,8 @@ import {
   extractCollectionId,
   extractPlaylistId
 } from "./utils/urlExtractors"
+import { VideoSummaryResponse } from "./types/summarize"
+import { summarizeVideo } from "./utils/summarizeVideo"
 
 /** Types */
 type DownloaderVersion = "v1" | "v2" | "v3"
@@ -457,5 +459,23 @@ export = {
    */
   TrendingCreators: async (options?: { proxy?: string }) => {
     return await getTrendingCreators(options?.proxy)
+  },
+
+  /**
+   * Summarize a TikTok Video using Google Gemini API (free)
+   * @param {string} url - The TikTok video URL to summarize
+   * @param {string} geminiApiKey - Your free Google Gemini API key (get one at https://aistudio.google.com/app/apikey)
+   * @param {Object} [options] - Optional settings
+   * @param {string} [options.proxy] - Optional proxy URL
+   * @returns {Promise<VideoSummaryResponse>}
+   */
+  SummarizeVideo: async (
+    url: string,
+    geminiApiKey: string,
+    options?: {
+      proxy?: string
+    }
+  ): Promise<VideoSummaryResponse> => {
+    return await summarizeVideo(url, geminiApiKey, options)
   }
 }

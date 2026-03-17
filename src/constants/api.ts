@@ -41,3 +41,7 @@ export const _ssstikapi: string = `${_ssstikurl}/abc?url=dl`
 export const _musicaldownurl: string = "https://musicaldown.com"
 export const _musicaldownapi: string = `${_musicaldownurl}/download`
 export const _musicaldownmusicapi: string = `${_musicaldownurl}/mp3/download`
+
+/** Google Gemini */
+export const _geminiApiUrl = (model: string, apiKey: string): string =>
+  `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
