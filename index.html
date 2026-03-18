@@ -332,6 +332,83 @@
         text-decoration: underline;
       }
 
+      /* Google API key row */
+      .api-key-row {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 10px;
+        align-items: center;
+      }
+
+      .api-key-row label {
+        font-size: 13px;
+        color: #555;
+        white-space: nowrap;
+      }
+
+      .api-key-row input {
+        flex: 1;
+        min-width: 220px;
+        padding: 10px 14px;
+        border: 1.5px solid #d0d0d0;
+        border-radius: 8px;
+        font-size: 14px;
+        color: #161823;
+        outline: none;
+        transition: border-color 0.2s;
+      }
+
+      .api-key-row input:focus {
+        border-color: #4285f4;
+      }
+
+      /* Summarize button inside video card */
+      .summarize-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        margin-top: 6px;
+        padding: 6px 12px;
+        background: #4285f4;
+        color: #fff;
+        border: none;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.2s;
+        width: 100%;
+        justify-content: center;
+      }
+
+      .summarize-btn:hover {
+        background: #2b6fd4;
+      }
+
+      .summarize-btn:disabled {
+        background: #a0bff8;
+        cursor: not-allowed;
+      }
+
+      .summary-box {
+        margin-top: 8px;
+        padding: 8px 10px;
+        background: #f0f6ff;
+        border-radius: 6px;
+        font-size: 12px;
+        color: #1a3a6c;
+        line-height: 1.5;
+        border: 1px solid #c5d9f8;
+        word-break: break-word;
+      }
+
+      .summary-box.error {
+        background: #fff0f3;
+        color: #c0003c;
+        border-color: #ffc0cd;
+      }
+
       /* Status messages */
       #status {
         display: none;
@@ -403,6 +480,16 @@
             style="max-width: 170px;"
           />
           <button id="search-btn">Search</button>
+        </div>
+        <div class="api-key-row">
+          <label for="apikey-input">Google API Key:</label>
+          <input
+            type="password"
+            id="apikey-input"
+            placeholder="Gemini API key (optional, for AI summaries)"
+            autocomplete="off"
+            spellcheck="false"
+          />
         </div>
       </div>
 
@@ -513,6 +600,7 @@
       /* ── render videos ── */
       function renderVideos(posts, username) {
         const section = document.getElementById("videos-section");
+        const apiKey = document.getElementById("apikey-input").value.trim();
 
         if (!posts || posts.length === 0) {
           section.innerHTML = `<p style="color:#999;text-align:center;padding:32px 0;">No videos found for this user.</p>`;
@@ -554,6 +642,7 @@
                     ? `<span class="stat">${icons.bookmark}${fmtNum(post.stats.collectCount)}</span>`
                     : ""}
                 </div>
+                ${apiKey ? `<button class="summarize-btn" data-video-url="${escapeHtml(videoUrl)}">✨ Summarize with AI</button><div class="summary-box" style="display:none;"></div>` : ""}
               </div>
               <div class="video-footer">
                 <span>${fmtDate(post.createTime)}</span>
@@ -565,6 +654,11 @@
 
         section.innerHTML = header + `<div class="video-grid">${cards}</div>`;
         section.classList.add("visible");
+
+        /* Attach event listeners to summarize buttons (avoids inline onclick XSS risk) */
+        section.querySelectorAll(".summarize-btn").forEach(btn => {
+          btn.addEventListener("click", () => summarizeVideo(btn));
+        });
       }
 
       /* ── XSS helper ── */
@@ -575,6 +669,43 @@
           .replace(/>/g, "&gt;")
           .replace(/"/g, "&quot;")
           .replace(/'/g, "&#39;");
+      }
+
+      /* ── summarize a single video ── */
+      async function summarizeVideo(btn) {
+        const apiKey = document.getElementById("apikey-input").value.trim();
+        if (!apiKey) {
+          alert("Please enter your Google API Key first.");
+          return;
+        }
+        const videoUrl = btn.getAttribute("data-video-url");
+        const summaryDiv = btn.nextElementSibling;
+        btn.disabled = true;
+        btn.textContent = "⏳ Summarizing…";
+        summaryDiv.style.display = "";
+        summaryDiv.className = "summary-box";
+        summaryDiv.textContent = "";
+        try {
+          const res = await fetch("/api/summarize", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ url: videoUrl, apiKey })
+          });
+          const data = await res.json();
+          if (data.status === "error") {
+            summaryDiv.className = "summary-box error";
+            summaryDiv.textContent = data.message || "Failed to summarize.";
+          } else {
+            summaryDiv.className = "summary-box";
+            summaryDiv.textContent = data.result || "No summary returned.";
+          }
+        } catch (err) {
+          summaryDiv.className = "summary-box error";
+          summaryDiv.textContent = `Request failed: ${err.message}`;
+        } finally {
+          btn.disabled = false;
+          btn.textContent = "✨ Summarize with AI";
+        }
       }
 
       /* ── main ── */
