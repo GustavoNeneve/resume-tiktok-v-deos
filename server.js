@@ -96,6 +96,45 @@ const server = http.createServer(async (req, res) => {
     return
   }
 
+  /* POST /api/summarize-video */
+  if (pathname === "/api/summarize-video" && req.method === "POST") {
+    const MAX_BODY = 4096 // 4 KB is more than enough for a URL + API key
+    let body = ""
+    req.on("data", chunk => {
+      body += chunk
+      if (body.length > MAX_BODY) {
+        req.destroy()
+        sendError(res, 413, "Request body too large")
+      }
+    })
+    req.on("end", async () => {
+      let url, apiKey
+      try {
+        const parsed = JSON.parse(body)
+        url = (parsed.url || "").trim()
+        apiKey = (parsed.apiKey || "").trim()
+      } catch (_) {
+        sendError(res, 400, "Invalid JSON body")
+        return
+      }
+      if (!url) {
+        sendError(res, 400, "url is required")
+        return
+      }
+      if (!apiKey) {
+        sendError(res, 400, "apiKey is required")
+        return
+      }
+      try {
+        const result = await Tiktok.SummarizeVideo(url, apiKey)
+        sendJSON(res, 200, result)
+      } catch (err) {
+        sendError(res, 500, err.message || "Internal server error")
+      }
+    })
+    return
+  }
+
   /* 404 for everything else */
   sendError(res, 404, "Not found")
 })
