@@ -108,6 +108,102 @@
         cursor: not-allowed;
       }
 
+      .api-key-row {
+        display: flex;
+        gap: 10px;
+        margin-top: 10px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+
+      .api-key-row input {
+        flex: 1;
+        min-width: 220px;
+        padding: 10px 14px;
+        border: 1.5px solid #d0d0d0;
+        border-radius: 8px;
+        font-size: 14px;
+        color: #161823;
+        outline: none;
+        transition: border-color 0.2s;
+      }
+
+      .api-key-row input:focus {
+        border-color: #4285f4;
+      }
+
+      .api-key-label {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 13px;
+        color: #555;
+        white-space: nowrap;
+      }
+
+      .api-key-label svg {
+        width: 16px;
+        height: 16px;
+        color: #4285f4;
+        flex-shrink: 0;
+      }
+
+      /* Summarize button on video cards */
+      .summarize-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 5px 10px;
+        background: #f0f4ff;
+        color: #4285f4;
+        border: 1px solid #c5d3f8;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.2s, color 0.2s;
+        white-space: nowrap;
+      }
+
+      .summarize-btn:hover {
+        background: #4285f4;
+        color: #fff;
+      }
+
+      .summarize-btn:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+      }
+
+      .summarize-btn svg {
+        width: 13px;
+        height: 13px;
+        flex-shrink: 0;
+      }
+
+      /* Summary result area */
+      .video-summary {
+        font-size: 12px;
+        color: #333;
+        background: #f5f8ff;
+        border: 1px solid #d0dcf8;
+        border-radius: 6px;
+        padding: 8px 10px;
+        line-height: 1.6;
+        margin-top: 2px;
+      }
+
+      .video-summary.error {
+        background: #fff0f3;
+        border-color: #ffc0cd;
+        color: #c0003c;
+      }
+
+      .video-summary.loading {
+        color: #888;
+        font-style: italic;
+      }
+
       /* Profile card */
       #profile-section {
         display: none;
@@ -404,6 +500,19 @@
           />
           <button id="search-btn">Search</button>
         </div>
+        <div class="api-key-row">
+          <span class="api-key-label">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12.65 10A6 6 0 1 0 7 17h.09A6 6 0 0 0 12.65 10zm-5.65 5a4 4 0 1 1 4-4 4 4 0 0 1-4 4zm13-3h-1V9a3 3 0 0 0-6 0v3h-1a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-5a2 2 0 0 0-2-2zm-4 4.72V18h-2v-1.28a2 2 0 1 1 2 0z"/></svg>
+            Google API Key:
+          </span>
+          <input
+            type="password"
+            id="apikey-input"
+            placeholder="Enter your Gemini API key (optional — enables AI summaries)"
+            autocomplete="off"
+            spellcheck="false"
+          />
+        </div>
       </div>
 
       <!-- Status -->
@@ -554,10 +663,17 @@
                     ? `<span class="stat">${icons.bookmark}${fmtNum(post.stats.collectCount)}</span>`
                     : ""}
                 </div>
+                <div id="summary-${escapeHtml(post.id)}"></div>
               </div>
               <div class="video-footer">
                 <span>${fmtDate(post.createTime)}</span>
-                <a href="${videoUrl}" target="_blank" rel="noopener">View on TikTok ↗</a>
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <button class="summarize-btn" data-video-url="${escapeHtml(videoUrl)}" data-post-id="${escapeHtml(post.id)}" title="Summarize with Google Gemini AI">
+                    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 17.93V18a1 1 0 0 0-2 0v1.93A8 8 0 0 1 4.07 13H6a1 1 0 0 0 0-2H4.07A8 8 0 0 1 11 4.07V6a1 1 0 0 0 2 0V4.07A8 8 0 0 1 19.93 11H18a1 1 0 0 0 0 2h1.93A8 8 0 0 1 13 19.93z"/></svg>
+                    Summarize
+                  </button>
+                  <a href="${videoUrl}" target="_blank" rel="noopener">View on TikTok ↗</a>
+                </div>
               </div>
             </div>
           `;
@@ -575,6 +691,42 @@
           .replace(/>/g, "&gt;")
           .replace(/"/g, "&quot;")
           .replace(/'/g, "&#39;");
+      }
+
+      /* ── summarize video ── */
+      async function summarizeVideo(videoUrl, postId) {
+        const apiKey = document.getElementById("apikey-input").value.trim();
+        if (!apiKey) {
+          alert("Please enter your Google (Gemini) API key in the field above to use AI summaries.");
+          document.getElementById("apikey-input").focus();
+          return;
+        }
+
+        const summaryEl = document.getElementById(`summary-${postId}`);
+        if (!summaryEl) return;
+        const btn = summaryEl.closest(".video-card").querySelector(".summarize-btn");
+
+        summaryEl.innerHTML = `<div class="video-summary loading">Generating summary…</div>`;
+        btn.disabled = true;
+
+        try {
+          const res = await fetch("/api/summarize-video", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ url: videoUrl, apiKey })
+          });
+          const data = await res.json();
+          if (data.status === "error") {
+            summaryEl.innerHTML = `<div class="video-summary error">${escapeHtml(data.message || "Failed to generate summary.")}</div>`;
+          } else {
+            const text = data.result?.summary || data.result || "";
+            summaryEl.innerHTML = `<div class="video-summary">${escapeHtml(String(text))}</div>`;
+          }
+        } catch (err) {
+          summaryEl.innerHTML = `<div class="video-summary error">Request failed: ${escapeHtml(err.message)}</div>`;
+        } finally {
+          btn.disabled = false;
+        }
       }
 
       /* ── main ── */
@@ -637,6 +789,15 @@
       document.getElementById("search-btn").addEventListener("click", loadUserVideos);
       document.getElementById("username-input").addEventListener("keydown", function (e) {
         if (e.key === "Enter") loadUserVideos();
+      });
+
+      /* Event delegation for summarize buttons rendered inside video cards */
+      document.getElementById("videos-section").addEventListener("click", function (e) {
+        const btn = e.target.closest(".summarize-btn");
+        if (!btn) return;
+        const videoUrl = btn.dataset.videoUrl;
+        const postId = btn.dataset.postId;
+        if (videoUrl && postId) summarizeVideo(videoUrl, postId);
       });
     </script>
   </body>
