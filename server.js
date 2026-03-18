@@ -79,6 +79,22 @@ const server = http.createServer(async (req, res) => {
     return
   }
 
+  /* GET /api/video-info?url=<tiktok-video-url> */
+  if (pathname === "/api/video-info") {
+    const url = (query.get("url") || "").trim()
+    if (!url) {
+      sendError(res, 400, "url query parameter is required")
+      return
+    }
+    try {
+      const result = await Tiktok.Downloader(url, { version: "v1" })
+      sendJSON(res, 200, result)
+    } catch (err) {
+      sendError(res, 500, err.message || "Internal server error")
+    }
+    return
+  }
+
   /* GET /api/user-videos?username=<username>&limit=<n> */
   if (pathname === "/api/user-videos") {
     const username = (query.get("username") || "").trim()

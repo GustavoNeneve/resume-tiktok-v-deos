@@ -481,12 +481,17 @@
     <div class="container">
       <!-- Search form -->
       <div class="search-box">
-        <h2>Search User Videos</h2>
+        <h2>Search Videos</h2>
+        <p style="font-size:13px;color:#666;margin-bottom:14px;">
+          Enter a TikTok <strong>username</strong>, a <strong>profile URL</strong>
+          (e.g. <code>https://www.tiktok.com/@charlidamelio</code>), or a
+          <strong>video URL</strong> (e.g. <code>https://www.tiktok.com/@user/video/123</code>).
+        </p>
         <div class="input-row">
           <input
             type="text"
             id="username-input"
-            placeholder="Enter TikTok username (e.g. charlidamelio)"
+            placeholder="Username, @username, profile URL, or video URL"
             autocomplete="off"
             spellcheck="false"
           />
@@ -729,18 +734,138 @@
         }
       }
 
+      /* ── URL parsing helpers ── */
+      const PROFILE_URL_REGEX = /^https?:\/\/(?:www\.|m\.)?tiktok\.com\/@([\w.-]+)\/?(?:\?.*)?$/;
+      const VIDEO_URL_REGEX   = /^https?:\/\/(?:www\.|m\.|vm\.|vt\.|lite\.)?tiktok\.com\/(?:@[\w.-]+\/(?:video|photo)\/\d+|[\w\d]+)\/?(?:\?.*)?$/;
+
+      /** Extract a username from a TikTok profile URL, or return null if not a profile URL. */
+      function extractProfileUsername(url) {
+        const m = PROFILE_URL_REGEX.exec(url);
+        return m ? m[1] : null;
+      }
+
+      /**
+       * Parse what the user typed: returns { mode, value }
+       *   mode "video"    → value = full video URL
+       *   mode "profile"  → value = username extracted from URL
+       *   mode "username" → value = bare username
+       */
+      function parseInput(raw) {
+        const s = raw.trim();
+        const profileUsername = extractProfileUsername(s);
+        if (profileUsername) {
+          return { mode: "profile", value: profileUsername };
+        }
+        if (VIDEO_URL_REGEX.test(s)) {
+          return { mode: "video", value: s };
+        }
+        // Short TikTok links (vm.tiktok.com / vt.tiktok.com / lite.tiktok.com)
+        if (/^https?:\/\/(vm|vt|lite)\.tiktok\.com\//.test(s)) {
+          return { mode: "video", value: s };
+        }
+        return { mode: "username", value: s.replace(/^@/, "") };
+      }
+
+      /* ── load single video by URL ── */
+      async function loadSingleVideo(videoUrl) {
+        const btn = document.getElementById("search-btn");
+        btn.disabled = true;
+        setStatus("loading", "Fetching video info…");
+
+        // Reset
+        document.getElementById("profile-section").classList.remove("visible");
+        document.getElementById("profile-section").innerHTML = "";
+        document.getElementById("videos-section").classList.remove("visible");
+        document.getElementById("videos-section").innerHTML = "";
+
+        try {
+          const res = await fetch(`/api/video-info?url=${encodeURIComponent(videoUrl)}`);
+          const data = await res.json();
+          clearStatus();
+
+          if (data.status === "error") {
+            setStatus("error", `Error: ${data.message || "Failed to fetch video info."}`);
+            return;
+          }
+
+          const content = data.result;
+          if (!content) {
+            setStatus("error", "No video data returned. The URL may be private or unsupported.");
+            return;
+          }
+
+          // Render single-video author as a minimal profile header
+          if (content.author) {
+            const a = content.author;
+            const section = document.getElementById("profile-section");
+            const avatarSrc = safeUrl(a.avatar || "");
+            section.innerHTML = `
+              <img class="profile-avatar" src="${avatarSrc}"
+                   alt="${escapeHtml(a.nickname || "")}" onerror="this.style.background='#ddd'">
+              <div class="profile-info">
+                <div class="nickname">${escapeHtml(a.nickname || "Unknown")}</div>
+                ${a.url ? `<div class="username"><a href="${escapeHtml(a.url)}" target="_blank" rel="noopener">${escapeHtml(a.url)}</a></div>` : ""}
+              </div>
+            `;
+            section.classList.add("visible");
+          }
+
+          // Build a synthetic post object from the downloader result and render it
+          const post = {
+            id: content.id || "",
+            desc: content.desc || "",
+            createTime: content.createTime,
+            stats: content.statistics
+              ? {
+                  likeCount:    content.statistics.likeCount,
+                  commentCount: content.statistics.commentCount,
+                  shareCount:   content.statistics.shareCount,
+                  playCount:    content.statistics.playCount
+                }
+              : null,
+            video: content.video
+              ? { cover: (content.video.cover || [])[0], duration: content.video.duration }
+              : null,
+            imagePost: content.images || []
+          };
+
+          const username = content.author?.url
+            ? (extractProfileUsername(content.author.url) || "")
+            : "";
+          renderVideos([post], username);
+
+        } catch (err) {
+          setStatus("error", `Request failed: ${err.message}. Make sure the server is running (npm run serve).`);
+        } finally {
+          btn.disabled = false;
+        }
+      }
+
       /* ── main ── */
       async function loadUserVideos() {
         const usernameInput = document.getElementById("username-input");
         const limitInput = document.getElementById("limit-input");
         const btn = document.getElementById("search-btn");
 
-        const username = usernameInput.value.trim().replace(/^@/, "");
-        if (!username) {
-          setStatus("error", "Please enter a TikTok username.");
+        const raw = usernameInput.value.trim();
+        if (!raw) {
+          setStatus("error", "Please enter a username, profile URL, or video URL.");
           return;
         }
 
+        const { mode, value } = parseInput(raw);
+
+        if (!value) {
+          setStatus("error", "Could not parse input. Please enter a valid username or TikTok URL.");
+          return;
+        }
+
+        if (mode === "video") {
+          await loadSingleVideo(value);
+          return;
+        }
+
+        const username = value;
         const limit = parseInt(limitInput.value, 10) || 20;
 
         // Reset
@@ -760,6 +885,12 @@
           );
           const profileData = await profileRes.json();
 
+          if (profileData.status === "error") {
+            clearStatus();
+            setStatus("error", `Could not load profile: ${profileData.message || "Unknown error."}`);
+            return;
+          }
+
           if (profileData.status === "success" && profileData.result) {
             renderProfile(profileData.result.user, profileData.result.stats);
           }
@@ -773,7 +904,7 @@
           clearStatus();
 
           if (videosData.status === "error") {
-            setStatus("error", videosData.message || "Failed to fetch videos.");
+            setStatus("error", `Could not load videos: ${videosData.message || "Unknown error."}`);
             return;
           }
 
